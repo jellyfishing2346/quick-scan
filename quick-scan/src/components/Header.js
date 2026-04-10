@@ -8,7 +8,7 @@ export default function Header() {
       <div className="search-wrap"><input type="text" id="search" placeholder="Search documents" /></div>
       <div className="key-wrap">
         <label>API KEY</label>
-        <input type="password" id="apikey" placeholder="test" autoComplete="off" />
+        <input type="password" id="apikey" defaultValue={process.env.REACT_APP_ANTHROPIC_KEY || ''} autoComplete="off" />
         <span className="key-status no" id="key-status">No key</span>
       </div>
       <div className="hstats">

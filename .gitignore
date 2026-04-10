@@ -1,2 +1,9 @@
 # Ignore environment variable files
 .env
+**/.env
+
+# Claude Code local settings
+.claude/
+
+
+
