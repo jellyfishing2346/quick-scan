@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickScan</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700&family=DM+Sans:wght@300;400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1611;
+    --ink-2: #4a4035;
+    --ink-3: #8a7a6a;
+    --paper: #faf7f2;
+    --paper-2: #f2ede4;
+    --paper-3: #e8e0d0;
+    --gold: #c9933a;
+    --gold-light: #f0d9a8;
+    --border: rgba(90, 70, 40, 0.18);
+    --border-strong: rgba(90, 70, 40, 0.35);
+  }
+
+  body { font-family: 'DM Sans', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh; }
+  .app-shell { display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    background: var(--ink);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    border-bottom: 3px solid var(--gold);
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--paper);
+    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-icon {
+    width: 24px; height: 24px;
+    border: 2px solid var(--gold);
+    border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--gold); font-weight: 700;
+  }
+
+  .header-stats { display: flex; gap: 20px; }
+  .stat-pill { font-size: 12px; color: var(--paper-3); font-weight: 300; letter-spacing: 0.05em; }
+  .stat-pill span { color: var(--gold); font-weight: 500; }
+
+  main { flex: 1; display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 56px); }
+
+  .sidebar {
+    background: var(--paper-2);
+    border-right: 1px solid var(--border);
+    padding: 1.5rem 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-section-label {
+    font-size: 10px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--ink-3); padding: 0 1.25rem; margin-bottom: 8px; margin-top: 4px;
+  }
+
+  .scan-zone {
+    margin: 0 1rem 1.5rem;
+    border: 1.5px dashed var(--gold);
+    border-radius: 8px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.2s;
+    background: transparent;
+    position: relative;
+  }
+
+  .scan-zone:hover { background: rgba(201,147,58,0.06); }
+  .scan-zone input[type=file] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+  .scan-icon { font-size: 28px; margin-bottom: 8px; display: block; }
+  .scan-title { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 500; color: var(--ink); margin-bottom: 4px; }
+  .scan-sub { font-size: 11px; color: var(--ink-3); line-height: 1.5; }
+
+  .year-list { flex: 1; overflow-y: auto; }
+
+  .year-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 1.25rem; cursor: pointer;
+    border-left: 3px solid transparent; transition: all 0.15s;
+  }
+
+  .year-item:hover { background: rgba(201,147,58,0.08); }
+  .year-item.active { border-left-color: var(--gold); background: rgba(201,147,58,0.1); }
+  .year-label { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 500; color: var(--ink); }
+  .year-count { font-size: 11px; background: var(--paper-3); color: var(--ink-2); padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+  .year-item.active .year-count { background: var(--gold); color: white; }
+
+  .content-area { padding: 2rem; overflow-y: auto; background: var(--paper); }
+
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh; gap: 16px; text-align: center; }
+  .empty-ornament { font-size: 56px; filter: grayscale(0.6) opacity(0.5); }
+  .empty-title { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 500; color: var(--ink-2); }
+  .empty-sub { font-size: 14px; color: var(--ink-3); max-width: 260px; line-height: 1.6; }
+
+  .content-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+  .content-title { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; color: var(--ink); }
+  .content-subtitle { font-size: 13px; color: var(--ink-3); }
+
+  .docs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.25rem; }
+
+  .doc-card { background: white; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; cursor: pointer; transition: all 0.2s; }
+  .doc-card:hover { border-color: var(--gold); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(90,70,40,0.12); }
+
+  .doc-thumb { height: 150px; background: var(--paper-2); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; border-bottom: 1px solid var(--border); }
+  .doc-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .doc-thumb-placeholder { font-size: 42px; filter: grayscale(0.5) opacity(0.6); }
+
+  .doc-badge { position: absolute; top: 8px; right: 8px; background: var(--ink); color: var(--gold-light); font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.04em; }
+
+  .doc-info { padding: 10px 12px; }
+  .doc-name { font-size: 13px; font-weight: 500; color: var(--ink); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .doc-meta { font-size: 11px; color: var(--ink-3); }
+
+  .doc-actions { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--paper-2); }
+
+  .btn-sm { flex: 1; font-size: 11px; font-weight: 500; padding: 5px 8px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border-strong); background: white; color: var(--ink-2); text-align: center; transition: all 0.15s; font-family: 'DM Sans', sans-serif; }
+  .btn-sm:hover { background: var(--gold); color: white; border-color: var(--gold); }
+  .btn-sm.primary { background: var(--ink); color: var(--gold-light); border-color: var(--ink); }
+  .btn-sm.primary:hover { background: var(--gold); border-color: var(--gold); color: white; }
+
+  .processing-overlay { display: none; position: fixed; inset: 0; background: rgba(26,22,17,0.7); z-index: 100; flex-direction: column; align-items: center; justify-content: center; }
+  .processing-overlay.active { display: flex; }
+
+  .processing-box { background: var(--paper); border-radius: 10px; padding: 2rem 2.5rem; text-align: center; border: 2px solid var(--gold); min-width: 280px; }
+  .spinner { width: 36px; height: 36px; border: 3px solid var(--paper-3); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .processing-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 500; color: var(--ink); margin-bottom: 6px; }
+  .processing-sub { font-size: 12px; color: var(--ink-3); }
+
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--ink); color: var(--paper); padding: 10px 18px; border-radius: 6px; border-left: 3px solid var(--gold); font-size: 13px; z-index: 200; transform: translateY(80px); opacity: 0; transition: all 0.3s; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  .all-years-view .year-section { margin-bottom: 2.5rem; }
+  .year-section-heading { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700; color: var(--ink); margin-bottom: 1rem; display: flex; align-items: center; gap: 10px; }
+  .year-section-heading::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header>
+    <div class="logo">
+      <div class="logo-icon">QS</div>
+      QuickScan
+    </div>
+    <div class="header-stats">
+      <span class="stat-pill">Documents: <span id="total-docs">0</span></span>
+      <span class="stat-pill">Years: <span id="total-years">0</span></span>
+    </div>
+  </header>
+
+  <main>
+    <aside class="sidebar">
+      <div class="sidebar-section-label">Scan Document</div>
+      <label class="scan-zone">
+        <input type="file" id="file-input" accept="image/*,.pdf" multiple>
+        <span class="scan-icon">📄</span>
+        <div class="scan-title">Upload & Scan</div>
+        <div class="scan-sub">JPG, PNG, or PDF<br>AI detects the year automatically</div>
+      </label>
+
+      <div class="sidebar-section-label">Archive by Year</div>
+      <div class="year-list" id="year-list">
+        <div class="year-item active" data-year="all">
+          <span class="year-label" style="font-size:15px;">All Documents</span>
+          <span class="year-count" id="all-count">0</span>
+        </div>
+      </div>
+    </aside>
+
+    <div class="content-area" id="content-area">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-ornament">📂</div>
+        <div class="empty-title">Your archive is empty</div>
+        <div class="empty-sub">Upload an image or PDF to scan it into QuickScan. Claude will read the document and file it under the correct year.</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="processing-overlay" id="processing-overlay">
+  <div class="processing-box">
+    <div class="spinner"></div>
+    <div class="processing-title" id="processing-title">Scanning document…</div>
+    <div class="processing-sub" id="processing-sub">AI is reading the date</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { jsPDF } = window.jspdf;
+const state = { docs: [], activeYear: 'all' };
+
+const fileInput = document.getElementById('file-input');
+const yearList = document.getElementById('year-list');
+const contentArea = document.getElementById('content-area');
+const emptyState = document.getElementById('empty-state');
+const overlay = document.getElementById('processing-overlay');
+const procTitle = document.getElementById('processing-title');
+const procSub = document.getElementById('processing-sub');
+
+fileInput.addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  fileInput.value = '';
+  for (const file of files) await processFile(file);
+});
+
+async function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function processFile(file) {
+  showOverlay('Reading document…', 'Preparing image for AI analysis');
+  try {
+    const b64full = await toBase64(file);
+    const isImage = file.type.startsWith('image/');
+    const thumbUrl = isImage ? b64full : null;
+    const imageDataForClaude = b64full.split(',')[1];
+    const mediaType = file.type;
+
+    showOverlay('Analysing document…', 'Claude is detecting the year');
+
+    let year = 'Unknown', docType = 'Document';
+
+    try {
+      const contentBlock = isImage
+        ? { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageDataForClaude } }
+        : { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: imageDataForClaude } };
+
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 200,
+          messages: [{
+            role: 'user',
+            content: [
+              contentBlock,
+              { type: 'text', text: 'Look at this document. Identify: 1) The year it is from (check dates, headers, copyright). 2) What type of document it is (invoice, letter, contract, receipt, tax form, etc.). Respond ONLY with JSON: {"year": "2021", "type": "Invoice"}. Use "Unknown" if no year found.' }
+            ]
+          }]
+        })
+      });
+      const data = await resp.json();
+      const text = data.content?.find(b => b.type === 'text')?.text || '{}';
+      const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+      year = parsed.year || 'Unknown';
+      docType = parsed.type || 'Document';
+    } catch (err) { console.warn('AI detection failed', err); }
+
+    showOverlay('Generating PDF…', 'Converting to archival format');
+
+    let finalPdfUrl = b64full;
+    if (isImage) {
+      const img = new Image();
+      img.src = b64full;
+      await new Promise(r => img.onload = r);
+      const w = img.naturalWidth || 800, h = img.naturalHeight || 1100;
+      const pdf = new jsPDF({ orientation: w > h ? 'landscape' : 'portrait', unit: 'px', format: [w, h] });
+      pdf.addImage(b64full, file.type.includes('png') ? 'PNG' : 'JPEG', 0, 0, w, h);
+      finalPdfUrl = pdf.output('datauristring');
+    }
+
+    state.docs.push({
+      id: Date.now() + Math.random(),
+      name: file.name.replace(/\.[^.]+$/, ''),
+      type: docType, year, pdfUrl: finalPdfUrl, thumbUrl,
+      addedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    });
+
+    renderAll();
+    showToast(`Filed under ${year}`);
+  } catch (err) {
+    showToast('Error processing file.');
+    console.error(err);
+  } finally { hideOverlay(); }
+}
+
+function getYears() {
+  const map = {};
+  state.docs.forEach(d => { map[d.year] = (map[d.year] || 0) + 1; });
+  return Object.entries(map).sort((a, b) => {
+    if (a[0] === 'Unknown') return 1;
+    if (b[0] === 'Unknown') return -1;
+    return parseInt(b[0]) - parseInt(a[0]);
+  });
+}
+
+function renderAll() {
+  document.getElementById('total-docs').textContent = state.docs.length;
+  document.getElementById('total-years').textContent = getYears().filter(y => y[0] !== 'Unknown').length;
+  document.getElementById('all-count').textContent = state.docs.length;
+
+  yearList.querySelectorAll('[data-year]:not([data-year="all"])').forEach(e => e.remove());
+  getYears().forEach(([yr, cnt]) => {
+    const el = document.createElement('div');
+    el.className = 'year-item' + (state.activeYear === yr ? ' active' : '');
+    el.dataset.year = yr;
+    el.innerHTML = `<span class="year-label">${yr}</span><span class="year-count">${cnt}</span>`;
+    el.addEventListener('click', () => setActiveYear(yr));
+    yearList.appendChild(el);
+  });
+
+  document.querySelector('[data-year="all"]').className = 'year-item' + (state.activeYear === 'all' ? ' active' : '');
+  renderContent();
+}
+
+function setActiveYear(yr) {
+  state.activeYear = yr;
+  yearList.querySelectorAll('.year-item').forEach(el => el.classList.toggle('active', el.dataset.year === String(yr)));
+  renderContent();
+}
+
+document.querySelector('[data-year="all"]').addEventListener('click', () => setActiveYear('all'));
+
+function renderContent() {
+  if (state.docs.length === 0) {
+    contentArea.innerHTML = '';
+    contentArea.appendChild(emptyState);
+    emptyState.style.display = 'flex';
+    return;
+  }
+  if (state.activeYear === 'all') {
+    contentArea.innerHTML = '<div class="all-years-view">' +
+      getYears().map(([yr]) => `<div class="year-section">
+        <div class="year-section-heading">${yr}</div>
+        <div class="docs-grid">${state.docs.filter(d => d.year === yr).map(docCardHTML).join('')}</div>
+      </div>`).join('') + '</div>';
+  } else {
+    const docs = state.docs.filter(d => d.year === state.activeYear);
+    contentArea.innerHTML = `
+      <div class="content-header">
+        <div>
+          <div class="content-title">${state.activeYear}</div>
+          <div class="content-subtitle">${docs.length} document${docs.length !== 1 ? 's' : ''}</div>
+        </div>
+      </div>
+      <div class="docs-grid">${docs.map(docCardHTML).join('')}</div>`;
+  }
+  attachCardEvents();
+}
+
+function docCardHTML(doc) {
+  const thumb = doc.thumbUrl ? `<img src="${doc.thumbUrl}" alt="${doc.name}" />` : `<span class="doc-thumb-placeholder">📄</span>`;
+  return `<div class="doc-card" data-id="${doc.id}">
+    <div class="doc-thumb">${thumb}<span class="doc-badge">${doc.type}</span></div>
+    <div class="doc-info">
+      <div class="doc-name" title="${doc.name}">${doc.name}</div>
+      <div class="doc-meta">Added ${doc.addedAt}</div>
+    </div>
+    <div class="doc-actions">
+      <button class="btn-sm primary" data-action="download" data-id="${doc.id}">Download PDF</button>
+      <button class="btn-sm" data-action="delete" data-id="${doc.id}">Remove</button>
+    </div>
+  </div>`;
+}
+
+function attachCardEvents() {
+  contentArea.querySelectorAll('[data-action]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = parseFloat(btn.dataset.id);
+      const doc = state.docs.find(d => d.id === id);
+      if (!doc) return;
+      if (btn.dataset.action === 'download') {
+        const a = document.createElement('a');
+        a.href = doc.pdfUrl;
+        a.download = `${doc.name}_${doc.year}.pdf`;
+        a.click();
+      } else {
+        state.docs = state.docs.filter(d => d.id !== id);
+        if (state.activeYear !== 'all' && !state.docs.find(d => d.year === state.activeYear)) state.activeYear = 'all';
+        renderAll();
+        showToast('Document removed');
+      }
+    });
+  });
+}
+
+function showOverlay(title, sub) { procTitle.textContent = title; procSub.textContent = sub; overlay.classList.add('active'); }
+function hideOverlay() { overlay.classList.remove('active'); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
