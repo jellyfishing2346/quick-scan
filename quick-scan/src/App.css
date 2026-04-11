@@ -107,4 +107,64 @@ header { background: var(--ink); height: 52px; padding: 0 1.25rem; display: flex
 .toast-el.show { transform: translateY(0); opacity: 1; }
 .ai-badge-detail { display: inline-block; background: rgba(201,147,58,0.15); color: #7a5a1a; font-size: 9px; font-weight: 500; padding: 2px 6px; border-radius: 3px; letter-spacing: 0.04em; margin-bottom: 8px; }
 .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--paper3); border-radius: 12px; padding: 3px 8px; font-size: 10px; color: var(--ink2); margin: 2px; }
-.no-key-notice { background: rgba(180,100,40,0.12); border: 1px solid rgba(180,100,40,0.3); border-radius: 6px; padding: 10px 12px; font-size: 12px; color: var(--ink2); line-height: 1.5; margin-bottom: 12px; }
+
+/* ── Skeleton shimmer ───────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+}
+.skel-thumb { width: 100%; height: 120px; border-bottom: 1px solid var(--b); }
+.skeleton-card .skel-thumb,
+.skeleton-card .skel-line {
+  background: linear-gradient(90deg, var(--paper3) 25%, #ece6da 50%, var(--paper3) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+.skel-line { height: 10px; border-radius: 4px; }
+
+/* ── Drag-and-drop ──────────────────────────────────────── */
+.main { position: relative; }
+.main.drag-over { outline: 2px dashed var(--gold); outline-offset: -10px; background: rgba(201,147,58,0.04); }
+.drop-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 5; }
+.drop-overlay span { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--gold); background: var(--paper); padding: 10px 22px; border-radius: 8px; border: 2px dashed var(--gold); }
+
+/* ── Hamburger button ───────────────────────────────────── */
+.menu-btn { display: none; background: none; border: none; cursor: pointer; padding: 6px; align-items: center; justify-content: center; flex-shrink: 0; }
+.menu-icon { display: block; width: 18px; height: 2px; background: var(--paper); border-radius: 2px; position: relative; transition: background 0.2s; }
+.menu-icon::before,
+.menu-icon::after { content: ''; position: absolute; left: 0; width: 18px; height: 2px; background: var(--paper); border-radius: 2px; transition: transform 0.25s, top 0.25s; }
+.menu-icon::before { top: -5px; }
+.menu-icon::after  { top:  5px; }
+.menu-icon.open { background: transparent; }
+.menu-icon.open::before { top: 0; transform: rotate(45deg); }
+.menu-icon.open::after  { top: 0; transform: rotate(-45deg); }
+
+/* ── Sidebar backdrop ───────────────────────────────────── */
+.sidebar-backdrop { position: fixed; inset: 0; background: rgba(26,22,17,0.45); z-index: 15; }
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .menu-btn { display: flex; }
+  .hstats { display: none; }
+  .search-wrap { max-width: none; }
+
+  .sidebar {
+    position: fixed;
+    left: -220px;
+    top: 52px;
+    height: calc(100vh - 52px);
+    z-index: 20;
+    transition: left 0.25s ease;
+    box-shadow: 4px 0 16px rgba(90,70,40,0.18);
+  }
+  .sidebar.open { left: 0; }
+
+  .detail {
+    position: fixed;
+    inset: 52px 0 0 0;
+    width: 100% !important;
+    z-index: 25;
+    border-left: none;
+    border-top: 1px solid var(--b);
+  }
+}

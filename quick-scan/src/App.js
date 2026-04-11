@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { jsPDF } from 'jspdf';
 import './App.css';
 import Header from './components/Header';
@@ -6,7 +6,7 @@ import Sidebar from './components/Sidebar';
 import Main from './components/Main';
 import Detail from './components/Detail';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 function App() {
   const [docs, setDocs] = useState(() => {
@@ -20,7 +20,6 @@ function App() {
   const [activeYear, setActiveYear] = useState('all');
   const [selDoc, setSelDoc] = useState(null);
   const [activeTab, setActiveTab] = useState('sum');
-  const [proc, setProc] = useState({ show: false, title: '', sub: '' });
   const [toastMsg, setToastMsg] = useState('');
   const [chatHistory, setChatHistory] = useState(() => {
     try {
@@ -31,12 +30,12 @@ function App() {
     }
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
   const toastTimer = useRef(null);
-  const procCount = useRef(0);
 
   useEffect(() => {
     try {
-      localStorage.setItem('qs-docs', JSON.stringify(docs));
+      localStorage.setItem('qs-docs', JSON.stringify(docs.filter(d => d.status !== 'pending')));
     } catch (err) {
       if (err.name === 'QuotaExceededError') showToast('Storage full — some documents may not persist');
     }
@@ -46,7 +45,7 @@ function App() {
     try {
       localStorage.setItem('qs-chat', JSON.stringify(chatHistory));
     } catch {
-      // chat history is non-critical, fail silently
+      // non-critical
     }
   }, [chatHistory]);
 
@@ -54,20 +53,6 @@ function App() {
     setToastMsg(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToastMsg(''), 3500);
-  }
-
-  function showProc(title, sub) {
-    procCount.current++;
-    setProc({ show: true, title, sub });
-  }
-
-  function updateProc(title, sub) {
-    setProc({ show: true, title, sub });
-  }
-
-  function hideProc() {
-    procCount.current = Math.max(0, procCount.current - 1);
-    if (procCount.current === 0) setProc(p => ({ ...p, show: false }));
   }
 
   async function callClaude(messages, maxTokens = 1200) {
@@ -94,13 +79,19 @@ function App() {
   }
 
   async function processFile(file) {
-    showProc('Reading document…', 'Sending to AI for analysis');
+    const pendingId = Date.now() + Math.random();
+    setDocs(prev => [...prev, {
+      id: pendingId,
+      name: file.name.replace(/\.[^.]+$/, ''),
+      status: 'pending',
+      addedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    }]);
+    setChatHistory(prev => ({ ...prev, [pendingId]: [] }));
+
     try {
       const b64full = await toBase64(file);
       const isImage = file.type.startsWith('image/');
       const b64 = b64full.split(',')[1];
-
-      updateProc('Extracting text & metadata…', 'Claude is reading the document');
 
       let year = 'Unknown', docType = 'Document', extractedText = '', summary = '', keyFacts = [];
 
@@ -133,8 +124,6 @@ function App() {
         showToast('AI error: ' + err.message);
       }
 
-      updateProc('Generating PDF…', 'Converting to archival format');
-
       let pdfUrl = b64full;
       if (isImage) {
         const img = new Image();
@@ -146,23 +135,18 @@ function App() {
         pdfUrl = pdf.output('datauristring');
       }
 
-      const doc = {
-        id: Date.now() + Math.random(),
-        name: file.name.replace(/\.[^.]+$/, ''),
+      setDocs(prev => prev.map(d => d.id === pendingId ? {
+        ...d,
+        status: 'done',
         type: docType, year, pdfUrl,
         thumbUrl: isImage ? b64full : null,
-        extractedText, summary, keyFacts,
-        addedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-      };
-
-      setDocs(prev => [...prev, doc]);
-      setChatHistory(prev => ({ ...prev, [doc.id]: [] }));
+        extractedText, summary, keyFacts
+      } : d));
       showToast(`Filed under ${year}`);
     } catch (err) {
       showToast('Error: ' + err.message);
+      setDocs(prev => prev.filter(d => d.id !== pendingId));
       console.error(err);
-    } finally {
-      hideProc();
     }
   }
 
@@ -175,7 +159,7 @@ function App() {
 
   function getYears() {
     const m = {};
-    docs.forEach(d => { m[d.year] = (m[d.year] || 0) + 1; });
+    docs.filter(d => d.status !== 'pending').forEach(d => { m[d.year] = (m[d.year] || 0) + 1; });
     return Object.entries(m).sort((a, b) => {
       if (a[0] === 'Unknown') return 1;
       if (b[0] === 'Unknown') return -1;
@@ -183,20 +167,27 @@ function App() {
     });
   }
 
-  function filteredDocs() {
+  const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    let filtered = activeYear === 'all' ? docs : docs.filter(d => d.year === activeYear);
-    if (q) filtered = filtered.filter(d =>
-      d.name.toLowerCase().includes(q) || d.type.toLowerCase().includes(q) || d.year.includes(q)
+    const pending = docs.filter(d => d.status === 'pending');
+    let done = activeYear === 'all'
+      ? docs.filter(d => d.status !== 'pending')
+      : docs.filter(d => d.status !== 'pending' && d.year === activeYear);
+    if (q) done = done.filter(d =>
+      d.name.toLowerCase().includes(q) ||
+      d.type.toLowerCase().includes(q) ||
+      d.year.includes(q) ||
+      (d.extractedText && d.extractedText.toLowerCase().includes(q)) ||
+      (d.summary && d.summary.toLowerCase().includes(q))
     );
-    return filtered;
-  }
+    return [...pending, ...done];
+  }, [docs, activeYear, searchQuery]);
 
   function handleDelete(id) {
     if (selDoc?.id === id) setSelDoc(null);
     setDocs(prev => {
       const next = prev.filter(d => d.id !== id);
-      if (activeYear !== 'all' && !next.find(d => d.year === activeYear)) setActiveYear('all');
+      if (activeYear !== 'all' && !next.find(d => d.year === activeYear && d.status !== 'pending')) setActiveYear('all');
       return next;
     });
     showToast('Document removed');
@@ -210,6 +201,7 @@ function App() {
   }
 
   function handleSelectDoc(doc) {
+    if (doc.status === 'pending') return;
     setSelDoc(doc);
     setActiveTab('sum');
   }
@@ -244,25 +236,30 @@ ${recentHistory.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.conte
 
   const years = getYears();
   const totalYears = years.filter(y => y[0] !== 'Unknown').length;
+  const doneDocs = docs.filter(d => d.status !== 'pending');
 
   return (
     <div className="shell">
       <Header
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        totalDocs={docs.length}
+        totalDocs={doneDocs.length}
         totalYears={totalYears}
+        menuOpen={menuOpen}
+        onMenuToggle={() => setMenuOpen(o => !o)}
       />
       <div className="body">
+        {menuOpen && <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />}
         <Sidebar
           years={years}
           activeYear={activeYear}
-          allCount={docs.length}
-          onYearChange={setActiveYear}
+          allCount={doneDocs.length}
+          onYearChange={yr => { setActiveYear(yr); setMenuOpen(false); }}
           onFileUpload={handleFiles}
+          isOpen={menuOpen}
         />
         <Main
-          docs={filteredDocs()}
+          docs={filtered}
           allDocs={docs}
           activeYear={activeYear}
           selDoc={selDoc}
@@ -271,6 +268,7 @@ ${recentHistory.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.conte
           onDownload={handleDownload}
           onDelete={handleDelete}
           years={years}
+          onFileUpload={handleFiles}
         />
         {selDoc && (
           <Detail
@@ -283,15 +281,6 @@ ${recentHistory.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.conte
           />
         )}
       </div>
-      {proc.show && (
-        <div className="proc-bar show">
-          <div className="proc-box">
-            <div className="spin"></div>
-            <div className="pt">{proc.title}</div>
-            <div className="ps">{proc.sub}</div>
-          </div>
-        </div>
-      )}
       {toastMsg && <div className="toast-el show">{toastMsg}</div>}
     </div>
   );

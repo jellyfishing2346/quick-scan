@@ -1,6 +1,6 @@
 import './Sidebar.css';
 
-export default function Sidebar({ years, activeYear, allCount, onYearChange, onFileUpload }) {
+export default function Sidebar({ years, activeYear, allCount, onYearChange, onFileUpload, isOpen }) {
   function handleChange(e) {
     const files = Array.from(e.target.files);
     e.target.value = '';
@@ -8,7 +8,7 @@ export default function Sidebar({ years, activeYear, allCount, onYearChange, onF
   }
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${isOpen ? ' open' : ''}`}>
       <div className="slabel">Scan</div>
       <label className="scanzone">
         <input type="file" accept="image/*,.pdf" multiple onChange={handleChange} />
