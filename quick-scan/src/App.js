@@ -184,6 +184,7 @@ function App() {
   }, [docs, activeYear, searchQuery]);
 
   function handleDelete(id) {
+    if (!window.confirm('Remove this document? This cannot be undone.')) return;
     if (selDoc?.id === id) setSelDoc(null);
     setDocs(prev => {
       const next = prev.filter(d => d.id !== id);
