@@ -1,19 +1,20 @@
-import React from 'react';
 import './Header.css';
 
-export default function Header() {
+export default function Header({ searchQuery, onSearchChange, totalDocs, totalYears }) {
   return (
     <header>
       <div className="logo"><div className="badge">QS</div>QuickScan</div>
-      <div className="search-wrap"><input type="text" id="search" placeholder="Search documents" /></div>
-      <div className="key-wrap">
-        <label>API KEY</label>
-        <input type="password" id="apikey" defaultValue={process.env.REACT_APP_ANTHROPIC_KEY || ''} autoComplete="off" />
-        <span className="key-status no" id="key-status">No key</span>
+      <div className="search-wrap">
+        <input
+          type="text"
+          placeholder="Search documents"
+          value={searchQuery}
+          onChange={e => onSearchChange(e.target.value)}
+        />
       </div>
       <div className="hstats">
-        <span className="sp">Docs: <span id="tdocs">0</span></span>
-        <span className="sp">Years: <span id="tyears">0</span></span>
+        <span className="sp">Docs: <span>{totalDocs}</span></span>
+        <span className="sp">Years: <span>{totalYears}</span></span>
       </div>
     </header>
   );
